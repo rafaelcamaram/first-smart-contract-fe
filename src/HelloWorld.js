@@ -4,6 +4,7 @@ import {
   helloWorldContract,
   connectWallet,
   updateMessage,
+  listenAccountChanges,
   loadCurrentMessage,
   getCurrentWalletConnected,
 } from "./util/interact.js";
@@ -11,37 +12,61 @@ import {
 import alchemylogo from "./alchemylogo.svg";
 
 const HelloWorld = () => {
-  //state variables
   const [walletAddress, setWallet] = useState("");
   const [status, setStatus] = useState("");
-  const [message, setMessage] = useState("No connection to the network."); //default message
+  const [message, setMessage] = useState("No connection to the network.");
   const [newMessage, setNewMessage] = useState("");
 
-  //called only once
-  useEffect(async () => {
-    
+  useEffect(() => {
+    async function load() {
+      const message = await loadCurrentMessage();
+      setMessage(message)
+      addSmartContractListener();
+
+      const { address, status } = await getCurrentWalletConnected();
+      setWallet(address);
+      setStatus(status);
+
+      addWalletListener();
+    }
+
+    load()
   }, []);
 
-  function addSmartContractListener() { //TODO: implement
-    
+  function addSmartContractListener() {
+    helloWorldContract.events.UpdatedMessages({}, (error, data) => {
+      if (error) {
+        setStatus(`😢 ${error.message}`);
+      } else {
+        setMessage(data.returnValues[1]);
+        setNewMessage('');
+        setStatus('🎉 Your message has been updated!');
+      }
+    })
   }
 
-  function addWalletListener() { //TODO: implement
-    
+  async function addWalletListener() {
+    await listenAccountChanges(({ status, walletAddress, error }) => {
+      setStatus(status);
+      setWallet(error ? '' : walletAddress);
+    });
   }
 
-  const connectWalletPressed = async () => { //TODO: implement
-    
+  const connectWalletPressed = async () => {
+    const walletResponse = await connectWallet();
+    setStatus(walletResponse.status);
+    setWallet(walletResponse.address);
   };
 
-  const onUpdatePressed = async () => { //TODO: implement
-    
+  const onUpdatePressed = async () => {
+    const { status } = await updateMessage(walletAddress, newMessage)
+    setStatus(status)
   };
 
   //the UI of our component
   return (
     <div id="container">
-      <img id="logo" src={alchemylogo}></img>
+      <img id="logo" alt="alchemylogo" src={alchemylogo}></img>
       <button id="walletButton" onClick={connectWalletPressed}>
         {walletAddress.length > 0 ? (
           "Connected: " +
